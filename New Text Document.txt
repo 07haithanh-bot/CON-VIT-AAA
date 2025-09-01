@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đua Vịt - Gọi Tên Ngẫu Nhiên</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Thư viện pháo giấy -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e0f2fe;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+            flex-direction: column;
+        }
+        .game-container {
+            background: #fff;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            max-width: 900px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .header {
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #1a202c;
+        }
+        .header p {
+            color: #4a5568;
+            margin-top: 0.5rem;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .textarea-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        textarea {
+            width: 100%;
+            border-radius: 0.5rem;
+            border: 1px solid #cbd5e0;
+            padding: 0.75rem;
+            font-size: 1rem;
+            resize: vertical;
+        }
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+        .race-track {
+            background: linear-gradient(to bottom, #63b3ed, #4299e1); /* Hiệu ứng nước */
+            border-radius: 1rem;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+            border: 5px solid #38a169; /* Thảm cỏ */
+        }
+        .duck-lane {
+            display: flex;
+            align-items: center;
+            height: 50px;
+            margin-bottom: 0.5rem;
+        }
+        .duck {
+            font-size: 2.5rem;
+            transition: transform 0.1s linear;
+            position: relative;
+            left: 0;
+            z-index: 10;
+            /* Đảo chiều biểu tượng vịt để nó hướng về phía trước */
+            transform: scaleX(-1);
+        }
+        .duck-name {
+            font-size: 0.875rem;
+            color: #fff;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            margin-left: 0.5rem;
+            z-index: 5;
+        }
+        .winner-box {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            background-color: #f7fafc;
+            border: 2px solid #38a169;
+        }
+        .winner-box.hidden {
+            display: none;
+        }
+        .winner-box h2 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #38a169;
+        }
+        .reset-btn {
+            background-color: #e53e3e;
+        }
+        .reset-btn:hover {
+            background-color: #c53030;
+        }
+        .start-btn {
+            background-color: #38a169;
+        }
+        .start-btn:hover {
+            background-color: #2f855a;
+        }
+        button {
+            padding: 0.75rem 2rem;
+            border-radius: 0.5rem;
+            color: #fff;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        .finish-line {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 10px;
+            background-color: #fff;
+            border-left: 2px dashed #000;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="header">
+            <h1>Đua Vịt - Gọi Tên Ngẫu Nhiên</h1>
+            <p>Danh sách học sinh lớp 3.1 đã được tải tự động. Nhấn "Bắt đầu cuộc đua"!</p>
+        </div>
+
+        <div class="controls">
+            <!-- Nút bắt đầu và chơi lại -->
+            <div class="button-group">
+                <button id="start-race-btn" class="start-btn">Bắt đầu cuộc đua</button>
+                <button id="reset-game-btn" class="reset-btn">Chơi lại</button>
+            </div>
+        </div>
+        
+        <div id="winner-display" class="winner-box hidden">
+            <h2>Học sinh được chọn là: <span id="winner-name">...</span></h2>
+        </div>
+
+        <div id="duck-race-track" class="race-track">
+            <!-- Vạch đích được thêm vào đây -->
+            <div class="finish-line"></div>
+            <!-- Vịt sẽ được tạo ở đây bằng JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        // Dữ liệu danh sách học sinh từ tệp CSV đã tải lên
+        const studentCsvData = `DANH SÁCH HỌC SINH LỚP BA 1,,,,,,,
+Năm học: 2025-2026,,,,,,,
+Giáo viên chủ nhiệm: thầy Hải Thành,,,,,,,
+STT,Mã định danh Bộ GD&ĐT,Họ tên,Ngày sinh,Giới tính,Dân tộc,SĐT liên hệ,
+1,7977249479,Nguyễn Hoàng Ngọc Anh,28/08/2017,Nữ,Kinh,0902992188,
+2,7955833244,Nguyễn Trâm Anh,08/08/2017,Nữ,Kinh,0945945068,
+3,7955673713,Trần Ngọc Nhã Anh,05/04/2017,Nữ,Kinh,0903031796,
+4,9449662296,Nguyễn Lâm Gia Bảo,28/02/2017,Nam,Kinh,0901467021,
+5,7977633400,Trần Nguyệt Di,29/03/2017,Nữ,Hoa,0937992827,Minh Đạo chuyển đến
+6,7977249525,Nguyễn Trương Hoàng Đức,06/11/2016,Nam,Kinh,0908631214,
+7,7977249526,Trần Nguyễn Gia Hân,19/05/2017,Nữ,Kinh,0909192536,
+8,7977249483,Huỳnh Gia Huy,06/04/2017,Nam,Kinh,0339391194,
+9,7977249482,Trần Chí Hưng,19/03/2017,Nam,Hoa,0902466983,
+10,7967309846,Trương Lê Kha,01/03/2017,Nam,Kinh,0903861786,
+11,7977249484,Trần Tuấn Khải,08/10/2017,Nam,Kinh,0974603739,
+12,7955905950,Phùng Tấn Khang,27/03/2017,Nam,Kinh,0908260609,
+13,7968154493,Nguyễn Đỗ Mỹ Kỳ,13/11/2017,Nữ,Kinh,0938860382,Chính Nghĩa chuyển đến
+14,7977531138,Trình Hiểu Lan,04/04/2017,Nữ,Hoa,094972253...`;
+
+        // Bỏ qua 4 dòng đầu và trích xuất tên từ cột thứ 3 (chỉ số 2)
+        const studentNames = studentCsvData.split('\n')
+            .slice(4) // Bỏ qua 4 dòng tiêu đề
+            .map(line => {
+                const parts = line.split(',');
+                return parts.length > 2 ? parts[2].trim() : null; // Lấy tên từ cột thứ 3
+            })
+            .filter(name => name && name !== ''); // Lọc tên trống hoặc không hợp lệ
+
+        const startRaceBtn = document.getElementById('start-race-btn');
+        const resetGameBtn = document.getElementById('reset-game-btn');
+        const duckRaceTrack = document.getElementById('duck-race-track');
+        const winnerDisplay = document.getElementById('winner-display');
+        const winnerNameSpan = document.getElementById('winner-name');
+
+        let students = studentNames;
+        let raceInterval;
+        let isRacing = false;
+
+        // Mảng chứa các emoji và màu sắc khác nhau
+        const duckEmojis = ['🦆', '🐥', '🐤', '🐧', '🦢', '🐦', '🦜', '🦚'];
+        const duckColors = [
+            '#FEE440', '#A9F1DF', '#FF9F1C', '#9FD356', '#546A76',
+            '#FF6B6B', '#C77DFF', '#39F2FF', '#FF00A2', '#2F9599'
+        ];
+
+        function createDuckLanes() {
+            duckRaceTrack.innerHTML = '<div class="finish-line"></div>'; // Đảm bảo vạch đích luôn ở đó
+            
+            // Xáo trộn danh sách học sinh để thứ tự các vịt khác nhau mỗi lần chơi
+            const shuffledStudents = [...students].sort(() => Math.random() - 0.5);
+
+            shuffledStudents.forEach((student, index) => {
+                const lane = document.createElement('div');
+                lane.classList.add('duck-lane');
+                
+                const duck = document.createElement('div');
+                duck.classList.add('duck');
+                
+                // Chọn một emoji và màu ngẫu nhiên cho mỗi vịt
+                const randomEmoji = duckEmojis[Math.floor(Math.random() * duckEmojis.length)];
+                const randomColor = duckColors[Math.floor(Math.random() * duckColors.length)];
+
+                duck.textContent = randomEmoji;
+                duck.style.color = randomColor;
+                duck.dataset.progress = 0; // Tốc độ di chuyển ban đầu
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.classList.add('duck-name');
+                nameSpan.textContent = student.trim();
+                
+                lane.appendChild(duck);
+                lane.appendChild(nameSpan);
+                duckRaceTrack.appendChild(lane);
+            });
+        }
+
+        function startGame() {
+            if (isRacing) return;
+            
+            if (students.length === 0) {
+                // Sử dụng một hộp thoại tùy chỉnh thay vì alert
+                const message = 'Không tìm thấy tên học sinh nào trong danh sách. Vui lòng kiểm tra lại tệp tin.';
+                const messageBox = document.createElement('div');
+                messageBox.classList.add('winner-box');
+                messageBox.innerHTML = `<h2>Lỗi!</h2><p>${message}</p>`;
+                duckRaceTrack.innerHTML = ''; // Xóa đường đua nếu có
+                duckRaceTrack.appendChild(messageBox);
+                return;
+            }
+
+            isRacing = true;
+            winnerDisplay.classList.add('hidden');
+            startRaceBtn.disabled = true;
+            resetGameBtn.disabled = true;
+
+            createDuckLanes();
+
+            const ducks = document.querySelectorAll('.duck');
+            const trackWidth = duckRaceTrack.offsetWidth - 50; // Trừ đi kích thước vịt
+
+            raceInterval = setInterval(() => {
+                let winnerFound = false;
+
+                ducks.forEach(duck => {
+                    const randomSpeed = Math.random() * 5 + 1; // Tốc độ ngẫu nhiên từ 1 đến 6
+                    let currentProgress = parseFloat(duck.dataset.progress);
+                    currentProgress += randomSpeed;
+                    duck.dataset.progress = currentProgress;
+
+                    // Lật lại vịt để hướng đúng
+                    const scaleX = duck.textContent === '🐧' || duck.textContent === '🐦' || duck.textContent === '🦜' ? 1 : -1;
+                    duck.style.transform = `translateX(${currentProgress}px) scaleX(${scaleX})`;
+
+                    // Kiểm tra xem vịt nào về đích chưa
+                    if (currentProgress >= trackWidth && !winnerFound) {
+                        winnerFound = true;
+                        
+                        const winnerDuck = duck;
+                        const winnerName = winnerDuck.nextElementSibling.textContent;
+
+                        // Dừng trò chơi
+                        clearInterval(raceInterval);
+                        isRacing = false;
+                        resetGameBtn.disabled = false;
+                        startRaceBtn.disabled = false;
+
+                        // Hiển thị người chiến thắng
+                        winnerNameSpan.textContent = winnerName;
+                        winnerDisplay.classList.remove('hidden');
+                        
+                        // Bắn pháo giấy chúc mừng
+                        launchConfetti();
+                    }
+                });
+            }, 50); // Cập nhật vị trí mỗi 50ms
+        }
+
+        // Hàm tạo hiệu ứng pháo giấy
+        function launchConfetti() {
+            const defaults = {
+                spread: 360,
+                ticks: 100,
+                gravity: 0.7,
+                decay: 0.9,
+                startVelocity: 30,
+                shapes: ['circle', 'square', 'star'],
+                scalar: 0.8,
+            };
+            
+            function shoot() {
+                confetti({
+                    ...defaults,
+                    particleCount: 25,
+                    origin: { y: 0.8, x: Math.random() },
+                });
+            }
+
+            // Bắn pháo giấy liên tục trong một khoảng thời gian ngắn
+            setTimeout(shoot, 0);
+            setTimeout(shoot, 100);
+            setTimeout(shoot, 200);
+        }
+
+        function resetGame() {
+            clearInterval(raceInterval);
+            isRacing = false;
+            winnerDisplay.classList.add('hidden');
+            duckRaceTrack.innerHTML = '';
+            startRaceBtn.disabled = false;
+            resetGameBtn.disabled = false;
+            // Không xóa danh sách học sinh vì nó được tích hợp sẵn
+        }
+
+        // Tự động tạo các làn đua khi trang được tải lần đầu
+        document.addEventListener('DOMContentLoaded', () => {
+            if (students.length > 0) {
+                createDuckLanes();
+            }
+        });
+
+        startRaceBtn.addEventListener('click', startGame);
+        resetGameBtn.addEventListener('click', resetGame);
+
+    </script>
+
+</body>
+</html>
